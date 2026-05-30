@@ -33,7 +33,7 @@ A production-grade **Node.js microservice** implementing a CRUD REST API for res
 
 ```bash
 # 1. Clone
-git clone https://github.com/samuelsanzou/restaurant-booking-service
+git clone https://github.com/SamuelSANZOUANGO/restaurant-booking-v2.git
 cd restaurant-booking-service
 
 # 2. Start everything
@@ -175,6 +175,12 @@ k6 run k6/smoke-test.js
 k6 run k6/load-test.js
 
 # Override base URL
+ifconfig : print etho address IP
+
+k6 run --env BASE_URL=http://AddressIP_PC k6/load-test.js
+
+or
+
 k6 run --env BASE_URL=http://staging.example.com k6/load-test.js
 ```
 

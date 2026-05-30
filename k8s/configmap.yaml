@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: booking-service-config
+  namespace: restaurant
+data:
+  # ── Configurable error injection rate ───────────────────────────────────────
+  # Set to "0" to disable synthetic 5xx responses entirely.
+  # Range: "0" to "100" (percent of API requests that will fail with 5xx).
+  ERROR_INJECTION_RATE: "10"

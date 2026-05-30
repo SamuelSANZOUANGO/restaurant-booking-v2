@@ -1,0 +1,95 @@
+{
+  "uid": "restaurant-booking-v1",
+  "title": "🍽️ Restaurant Booking Service",
+  "tags": ["restaurant", "booking", "nodejs"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "gridPos": {"h":4,"w":4,"x":0,"y":0},
+      "title": "Request Rate (req/s)",
+      "options": {"reduceOptions":{"calcs":["lastNotNull"]},"colorMode":"background","graphMode":"area"},
+      "targets": [{"expr":"sum(rate(http_requests_total{job='booking-service'}[1m]))","legendFormat":"req/s","refId":"A"}],
+      "fieldConfig":{"defaults":{"color":{"mode":"thresholds"},"thresholds":{"steps":[{"color":"green","value":null},{"color":"yellow","value":10},{"color":"red","value":50}]},"unit":"reqps"}}
+    },
+    {
+      "id": 2, "type": "stat", "gridPos": {"h":4,"w":4,"x":4,"y":0},
+      "title": "Error Rate (5xx %)",
+      "options": {"reduceOptions":{"calcs":["lastNotNull"]},"colorMode":"background"},
+      "targets": [{"expr":"100 * sum(rate(http_requests_total{job='booking-service',status_code=~'5..'}[1m])) / sum(rate(http_requests_total{job='booking-service'}[1m]))","legendFormat":"5xx %","refId":"A"}],
+      "fieldConfig":{"defaults":{"color":{"mode":"thresholds"},"thresholds":{"steps":[{"color":"green","value":null},{"color":"yellow","value":5},{"color":"red","value":15}]},"unit":"percent"}}
+    },
+    {
+      "id": 3, "type": "stat", "gridPos": {"h":4,"w":4,"x":8,"y":0},
+      "title": "P95 Latency",
+      "options": {"reduceOptions":{"calcs":["lastNotNull"]},"colorMode":"background"},
+      "targets": [{"expr":"histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job='booking-service'}[5m])) by (le))","legendFormat":"p95","refId":"A"}],
+      "fieldConfig":{"defaults":{"color":{"mode":"thresholds"},"thresholds":{"steps":[{"color":"green","value":null},{"color":"yellow","value":0.5},{"color":"red","value":1}]},"unit":"s"}}
+    },
+    {
+      "id": 4, "type": "stat", "gridPos": {"h":4,"w":4,"x":12,"y":0},
+      "title": "Active Bookings",
+      "options": {"reduceOptions":{"calcs":["lastNotNull"]},"colorMode":"value"},
+      "targets": [{"expr":"restaurant_active_bookings{job='booking-service'}","legendFormat":"bookings","refId":"A"}],
+      "fieldConfig":{"defaults":{"color":{"mode":"fixed","fixedColor":"blue"},"unit":"short"}}
+    },
+    {
+      "id": 5, "type": "stat", "gridPos": {"h":4,"w":4,"x":16,"y":0},
+      "title": "Error Injection Rate",
+      "options": {"reduceOptions":{"calcs":["lastNotNull"]},"colorMode":"value"},
+      "targets": [{"expr":"error_injection_rate_percent{job='booking-service'}","legendFormat":"injection %","refId":"A"}],
+      "fieldConfig":{"defaults":{"color":{"mode":"fixed","fixedColor":"orange"},"unit":"percent"}}
+    },
+    {
+      "id": 6, "type": "timeseries", "gridPos": {"h":8,"w":12,"x":0,"y":4},
+      "title": "HTTP Requests by Status Code",
+      "options": {"tooltip":{"mode":"multi"}},
+      "targets": [
+        {"expr":"sum by(status_code) (rate(http_requests_total{job='booking-service'}[1m]))","legendFormat":"{{status_code}}","refId":"A"}
+      ],
+      "fieldConfig":{"defaults":{"unit":"reqps"},"overrides":[
+        {"matcher":{"id":"byName","options":"200"},"properties":[{"id":"color","value":{"fixedColor":"green","mode":"fixed"}}]},
+        {"matcher":{"id":"byRegexp","options":"5.."},"properties":[{"id":"color","value":{"fixedColor":"red","mode":"fixed"}}]},
+        {"matcher":{"id":"byRegexp","options":"4.."},"properties":[{"id":"color","value":{"fixedColor":"yellow","mode":"fixed"}}]}
+      ]}
+    },
+    {
+      "id": 7, "type": "timeseries", "gridPos": {"h":8,"w":12,"x":12,"y":4},
+      "title": "Request Latency Percentiles",
+      "targets": [
+        {"expr":"histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job='booking-service'}[5m])) by (le))","legendFormat":"p50","refId":"A"},
+        {"expr":"histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job='booking-service'}[5m])) by (le))","legendFormat":"p95","refId":"B"},
+        {"expr":"histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job='booking-service'}[5m])) by (le))","legendFormat":"p99","refId":"C"}
+      ],
+      "fieldConfig":{"defaults":{"unit":"s"}}
+    },
+    {
+      "id": 8, "type": "timeseries", "gridPos": {"h":8,"w":12,"x":0,"y":12},
+      "title": "Request Rate by HTTP Method",
+      "targets": [
+        {"expr":"sum by(method) (rate(http_requests_total{job='booking-service'}[1m]))","legendFormat":"{{method}}","refId":"A"}
+      ],
+      "fieldConfig":{"defaults":{"unit":"reqps"}}
+    },
+    {
+      "id": 9, "type": "timeseries", "gridPos": {"h":8,"w":12,"x":12,"y":12},
+      "title": "5xx Error Rate Over Time",
+      "targets": [
+        {"expr":"sum(rate(http_requests_total{job='booking-service',status_code=~'5..'}[1m]))","legendFormat":"5xx errors/s","refId":"A"},
+        {"expr":"error_injection_rate_percent{job='booking-service'} / 100 * sum(rate(http_requests_total{job='booking-service'}[1m]))","legendFormat":"expected (config)","refId":"B"}
+      ],
+      "fieldConfig":{"defaults":{"unit":"reqps"}}
+    },
+    {
+      "id": 10, "type": "table", "gridPos": {"h":8,"w":24,"x":0,"y":20},
+      "title": "Request Summary by Route & Method",
+      "options": {"sortBy":[{"desc":true,"displayName":"Total Requests"}]},
+      "targets": [
+        {"expr":"sum by(method,route,status_code) (increase(http_requests_total{job='booking-service'}[10m]))","legendFormat":"","refId":"A","instant":true,"format":"table"}
+      ],
+      "transformations": [{"id":"organize","options":{"excludeByName":{"Time":true}}}]
+    }
+  ]
+}

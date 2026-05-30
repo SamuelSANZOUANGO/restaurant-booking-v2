@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: booking-service
+  namespace: restaurant
+  labels:
+    # Must match the Prometheus Operator's serviceMonitorSelector label
+    release: prometheus
+    app: booking-service
+spec:
+  selector:
+    matchLabels:
+      app: booking-service
+  namespaceSelector:
+    matchNames:
+      - restaurant
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      honorLabels: true

@@ -1,0 +1,250 @@
+openapi: 3.0.3
+info:
+  title: Restaurant Booking Service API
+  version: 1.0.0
+  description: |
+    CRUD REST API for restaurant table bookings.
+
+    ### Error Injection
+    A configurable percentage of requests to `/api/*` will return a synthetic
+    `5xx` response to simulate downstream failures. Set `ERROR_INJECTION_RATE`
+    (0-100) in the service config or `.env`.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: bookings
+    description: Table booking operations
+  - name: tables
+    description: Restaurant table information
+  - name: system
+    description: Health and metrics
+
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Health check
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:   { type: string, example: ok }
+                  version:  { type: string, example: "1.0.0" }
+                  uptime:   { type: number, example: 123.45 }
+
+  /metrics:
+    get:
+      tags: [system]
+      summary: Prometheus metrics
+      responses:
+        "200":
+          description: Prometheus text exposition format
+
+  /api/bookings/tables:
+    get:
+      tags: [tables]
+      summary: List all restaurant tables
+      responses:
+        "200":
+          description: List of tables
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:  { type: array, items: { $ref: '#/components/schemas/Table' } }
+                  count: { type: integer }
+
+  /api/bookings/availability:
+    get:
+      tags: [tables]
+      summary: Check table availability for a given date and time
+      parameters:
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date }
+        - in: query
+          name: time
+          required: true
+          schema: { type: string, example: "19:30" }
+        - in: query
+          name: party_size
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Tables with availability flag
+        "400":
+          description: Missing required query params
+
+  /api/bookings:
+    get:
+      tags: [bookings]
+      summary: List bookings (filterable)
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [confirmed, cancelled, completed, no_show] }
+        - in: query
+          name: date
+          schema: { type: string, format: date }
+        - in: query
+          name: email
+          schema: { type: string, format: email }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          description: Paginated list of bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:  { type: array, items: { $ref: '#/components/schemas/Booking' } }
+                  count: { type: integer }
+                  total: { type: integer }
+
+    post:
+      tags: [bookings]
+      summary: Create a new booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingCreate' }
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Booking' }
+        "400": { description: Validation error }
+        "404": { description: Table not found }
+        "409": { description: Conflict – table already booked or capacity exceeded }
+
+  /api/bookings/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, format: uuid }
+
+    get:
+      tags: [bookings]
+      summary: Get a single booking
+      responses:
+        "200":
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Booking' }
+        "404": { description: Not found }
+
+    put:
+      tags: [bookings]
+      summary: Full update of a booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingCreate' }
+      responses:
+        "200": { description: Updated booking }
+        "400": { description: Validation error }
+        "404": { description: Not found }
+
+    patch:
+      tags: [bookings]
+      summary: Partial update (e.g. change status or notes)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingPatch' }
+      responses:
+        "200": { description: Updated booking }
+        "400": { description: Validation error }
+        "404": { description: Not found }
+
+    delete:
+      tags: [bookings]
+      summary: Cancel a booking
+      responses:
+        "200": { description: Booking cancelled }
+        "404": { description: Not found }
+
+components:
+  schemas:
+    Table:
+      type: object
+      properties:
+        id:           { type: integer }
+        table_number: { type: integer }
+        capacity:     { type: integer }
+        location:     { type: string, enum: [main, terrace, private] }
+
+    Booking:
+      type: object
+      properties:
+        id:             { type: string, format: uuid }
+        table_id:       { type: integer }
+        table_number:   { type: integer }
+        capacity:       { type: integer }
+        location:       { type: string }
+        customer_name:  { type: string }
+        customer_email: { type: string, format: email }
+        customer_phone: { type: string, nullable: true }
+        party_size:     { type: integer }
+        booking_date:   { type: string, format: date }
+        booking_time:   { type: string, example: "19:30" }
+        duration_min:   { type: integer, default: 90 }
+        status:         { type: string, enum: [confirmed, cancelled, completed, no_show] }
+        notes:          { type: string, nullable: true }
+        created_at:     { type: string, format: date-time }
+        updated_at:     { type: string, format: date-time }
+
+    BookingCreate:
+      type: object
+      required: [table_id, customer_name, customer_email, party_size, booking_date, booking_time]
+      properties:
+        table_id:       { type: integer }
+        customer_name:  { type: string }
+        customer_email: { type: string, format: email }
+        customer_phone: { type: string }
+        party_size:     { type: integer, minimum: 1, maximum: 50 }
+        booking_date:   { type: string, format: date }
+        booking_time:   { type: string, example: "19:30" }
+        duration_min:   { type: integer, default: 90 }
+        notes:          { type: string }
+
+    BookingPatch:
+      type: object
+      properties:
+        table_id:       { type: integer }
+        customer_name:  { type: string }
+        customer_email: { type: string, format: email }
+        customer_phone: { type: string }
+        party_size:     { type: integer }
+        booking_date:   { type: string, format: date }
+        booking_time:   { type: string }
+        duration_min:   { type: integer }
+        status:         { type: string, enum: [confirmed, cancelled, completed, no_show] }
+        notes:          { type: string }
